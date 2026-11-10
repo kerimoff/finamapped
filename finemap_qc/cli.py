@@ -97,12 +97,13 @@ def main(argv=None):
         report.plot_quantitative(annot, groups, f, path, log_distance=f.startswith("dist_"))
         images["quantitative"].append(path)
 
-    params = {"credible_sets": args.credible_sets, "high_pip": f"> {args.high_pip}",
+    name = lambda p: p and os.path.basename(p)  # noqa: E731 - reports get shared; don't leak local paths
+    params = {"credible_sets": name(args.credible_sets), "high_pip": f"> {args.high_pip}",
               "low_pip": f"< {args.low_pip}", "anchor_pip (low_anchored)": f"> {args.anchor_pip}",
-              "gtf": args.gtf, "canonical_only": args.canonical_only}
-    params.update({f"bed:{n}": p for n, p in args.bed})
-    params.update({f"variant_set:{n}": p for n, p in args.variant_set})
-    params.update({f"score:{n}": p for n, p in args.score})
+              "gtf": name(args.gtf), "canonical_only": args.canonical_only}
+    params.update({f"bed:{n}": name(p) for n, p in args.bed})
+    params.update({f"variant_set:{n}": name(p) for n, p in args.variant_set})
+    params.update({f"score:{n}": name(p) for n, p in args.score})
     report.write_html(out("report.html"), "Fine-mapping QC report", params, summary, bin_tab, q_tab, images)
     print(f"Report written to {out('report.html')}")
 

@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fine-mapping QC</title>
+<style>
+:root{color-scheme:light;
+--bg:#f4f3ef;--surface:#fcfcfb;--sunken:#efeeea;--ink-1:#1b1b19;--ink-2:#5d5c57;--ink-3:#8a8983;--line:#e6e5e0;--line-2:#d6d5cf;
+--accent:#2a78d6;--accent-ink:#fff;--accent-soft:#e6f0fc;--err:#c23b3a;--err-soft:#fbeaea;--ok:#127a52;
+--g-high:#2a78d6;--g-low-all:#eb6834;--g-low-anchored:#1baf7a;
+--shadow:0 1px 2px rgba(20,20,15,.05),0 2px 10px rgba(20,20,15,.04)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;
+--bg:#121211;--surface:#1c1c1a;--sunken:#171716;--ink-1:#f0efec;--ink-2:#c3c2b7;--ink-3:#8f8e86;--line:#2e2e2b;--line-2:#3d3d39;
+--accent:#3987e5;--accent-ink:#fff;--accent-soft:#17304f;--err:#f08a89;--err-soft:#3a1d1d;--ok:#4cc595;
+--g-high:#3987e5;--g-low-all:#d95926;--g-low-anchored:#199e70;--shadow:none}}
+:root[data-theme="dark"]{color-scheme:dark;
+--bg:#121211;--surface:#1c1c1a;--sunken:#171716;--ink-1:#f0efec;--ink-2:#c3c2b7;--ink-3:#8f8e86;--line:#2e2e2b;--line-2:#3d3d39;
+--accent:#3987e5;--accent-ink:#fff;--accent-soft:#17304f;--err:#f08a89;--err-soft:#3a1d1d;--ok:#4cc595;
+--g-high:#3987e5;--g-low-all:#d95926;--g-low-anchored:#199e70;--shadow:none}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+main{padding-bottom:24px}
+body{margin:0;background:var(--bg);color:var(--ink-1);
+font:15px/1.55 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.in{max-width:1180px;margin:0 auto;padding:0 24px}
+.top{border-bottom:1px solid var(--line)}
+.top .in{display:flex;align-items:center;height:56px;gap:16px}
+.brand{font-weight:650;display:flex;align-items:center;gap:9px}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--g-high);box-shadow:14px 0 0 var(--g-low-all),28px 0 0 var(--g-low-anchored);margin-right:30px}
+.top a{margin-left:auto;color:var(--ink-2);font-size:13.5px;text-decoration:none}
+.top a:hover{color:var(--ink-1)}
+.hero{padding:44px 0 26px;max-width:780px}
+.eyebrow{font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+h1{font-size:36px;line-height:1.12;letter-spacing:-.025em;margin:8px 0 12px;font-weight:700}
+.hero p{color:var(--ink-2);margin:0;font-size:16px}
+.layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:22px}
+.step{display:flex;align-items:center;gap:10px;margin:0 0 4px}
+.num{width:24px;height:24px;border-radius:50%;background:var(--sunken);border:1px solid var(--line);font-size:12.5px;font-weight:650;display:grid;place-items:center;color:var(--ink-2);flex:none}
+h2{font-size:16.5px;margin:0;font-weight:640;letter-spacing:-.01em}
+.hint{color:var(--ink-2);font-size:13.5px;margin:2px 0 14px 34px}
+.hint code,.mono{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace}
+.hint code{background:var(--sunken);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;
+border:1.5px dashed var(--line-2);border-radius:14px;padding:30px 18px;cursor:pointer;background:var(--sunken);transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop svg{color:var(--ink-3)}
+.drop b{font-weight:620}.drop span{color:var(--ink-3);font-size:13px}
+.drop.has{border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
+.file{display:flex;align-items:center;gap:8px;font-weight:600;word-break:break-all}
+input[type=file]{display:none}
+.or{display:flex;align-items:center;gap:12px;color:var(--ink-3);font-size:12.5px;margin:14px 0}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.btn{appearance:none;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-1);font:inherit;font-weight:560;font-size:14px;
+padding:9px 14px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:background .15s,border-color .15s}
+.btn:hover{background:var(--sunken)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:620}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn:disabled{opacity:.5;cursor:not-allowed;filter:none}
+.btn.wide{width:100%;justify-content:center;padding:12px 16px;font-size:15px}
+.sep{height:1px;background:var(--line);margin:22px 0}
+.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-left:34px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--ink-2);font-weight:550}
+label.f .sw{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:0}
+input[type=number]{font:inherit;font-size:15px;font-variant-numeric:tabular-nums;color:var(--ink-1);background:var(--sunken);border:1px solid var(--line-2);border-radius:10px;padding:8px 10px;width:100%}
+input[type=number]:focus,.btn:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer;margin:0 0 0 34px}
+.check input{margin-top:3px;accent-color:var(--accent);width:16px;height:16px;flex:none}
+.check small{display:block;color:var(--ink-3);font-size:12.5px}
+.feats{margin:10px 0 0 34px;display:flex;flex-wrap:wrap;gap:6px}
+.tag{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--sunken);border:1px solid var(--line);border-radius:7px;padding:2px 7px;color:var(--ink-2)}
+.tag i{font-style:normal;color:var(--ink-3);margin-left:4px;font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px}
+.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);margin:10px 0 0 34px}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+.pulse.load{background:var(--g-low-all);animation:p 1.2s infinite}.pulse.ok{background:var(--ok)}.pulse.err{background:var(--err)}
+@keyframes p{50%{opacity:.3}}
+details{margin:14px 0 0 34px}
+summary{cursor:pointer;font-size:14px;font-weight:560;color:var(--ink-2)}
+summary:hover{color:var(--ink-1)}
+.extras{display:grid;gap:10px;margin-top:12px}
+.extra{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13.5px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunken)}
+.extra small{display:block;color:var(--ink-3);font-size:12px}
+.extra .n{font-size:12.5px;color:var(--accent);font-weight:600}
+.warn{font-size:13px;color:var(--ink-2);background:var(--sunken);border:1px solid var(--line);border-left:3px solid var(--g-low-all);border-radius:10px;padding:10px 12px;margin:12px 0 0 34px}
+.side h3{font-size:14.5px;margin:0 0 10px;font-weight:640}
+.side ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.side li{display:flex;gap:10px;font-size:13.5px;color:var(--ink-2)}
+.side li .sw{width:10px;height:10px;border-radius:3px;margin-top:6px;flex:none}
+.side li b{color:var(--ink-1);font:600 13px ui-monospace,SFMono-Regular,Menlo,monospace}
+.side p{font-size:13.5px;color:var(--ink-2);margin:0}
+.side + .side{margin-top:16px}
+.runbar{margin-top:22px}
+.msg{margin-top:12px;font-size:13.5px;border-radius:10px;padding:10px 12px;display:none}
+.msg.err{display:block;background:var(--err-soft);color:var(--err)}
+#progress{display:none;margin-top:16px}
+.prog-row{display:flex;justify-content:space-between;font-size:13.5px;color:var(--ink-2);margin-bottom:8px}
+.track{height:6px;border-radius:6px;background:var(--sunken);overflow:hidden;border:1px solid var(--line)}
+.bar{height:100%;width:30%;background:var(--accent);border-radius:6px;animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(340%)}}
+#results{display:none;padding:34px 0 60px}
+.res-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.res-head h2{font-size:22px;letter-spacing:-.015em}
+.res-head p{margin:2px 0 0;color:var(--ink-2);font-size:13.5px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+iframe{width:100%;border:1px solid var(--line);border-radius:16px;background:var(--bg);height:80vh;display:block}
+footer.in{color:var(--ink-3);font-size:12.5px;padding-top:36px;padding-bottom:40px}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+@media (max-width:640px){.in{padding:0 16px}h1{font-size:28px}.hero{padding-top:28px}.card{padding:18px}
+.fields{grid-template-columns:1fr;margin-left:0}.hint,.check,.feats,.status,details,.warn{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="top"><div class="in"><div class="brand"><span class="dot"></span>finemap-qc</div>
+<a href="https://github.com/kerimoff/finamapped" target="_blank" rel="noopener">Source ↗</a></div></div>
+
+<main class="in">
+  <header class="hero">
+    <div class="eyebrow">Fine-mapping quality control</div>
+    <h1>Are your high-PIP variants really causal-looking?</h1>
+    <p>Upload fine-mapped credible sets. finemap-qc compares high-PIP and low-PIP variants for features of causal
+      variants (open chromatin, proximity to genes and splice sites, replication across studies) and returns an
+      interactive report.</p>
+  </header>
+
+  <div class="layout">
+    <form class="card" id="form" novalidate>
+      <div class="step"><span class="num">1</span><h2>Credible sets</h2></div>
+      <p class="hint">TSV with <code>cs_id</code>, <code>variant</code> (<code>chr_pos_ref_alt</code>, GRCh38) and
+        <code>pip</code>. eQTL Catalogue <code>*.credible_sets.tsv.gz</code> files work as they are.</p>
+      <label class="drop" id="drop" tabindex="0">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        <b id="dropTitle">Drop a file here or click to browse</b>
+        <span id="dropSub">.tsv, .tsv.gz or .txt</span>
+        <input type="file" id="cs" accept=".tsv,.gz,.txt,.csv">
+      </label>
+      <div class="or">or</div>
+      <button type="button" class="btn wide" id="example">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>
+        Try the simulated example dataset
+      </button>
+
+      <div class="sep"></div>
+      <div class="step"><span class="num">2</span><h2>Variant groups</h2></div>
+      <p class="hint">Thresholds that split variants into the groups being compared.</p>
+      <div class="fields">
+        <label class="f"><span><i class="sw" style="background:var(--g-high)"></i>High PIP &gt;</span><input type="number" id="high" value="0.8" min="0" max="1" step="0.05"></label>
+        <label class="f"><span><i class="sw" style="background:var(--g-low-all)"></i>Low PIP &lt;</span><input type="number" id="low" value="0.05" min="0" max="1" step="0.01"></label>
+        <label class="f"><span><i class="sw" style="background:var(--g-low-anchored)"></i>Anchor top PIP &gt;</span><input type="number" id="anchor" value="0.5" min="0" max="1" step="0.05"></label>
+      </div>
+
+      <div class="sep"></div>
+      <div class="step"><span class="num">3</span><h2>Annotations</h2></div>
+      <p class="hint">Features the variants are tested for.</p>
+      <label class="check"><input type="checkbox" id="useRefs" checked>
+        <span>Use the server's reference annotations<small id="refsNote">Checking…</small></span></label>
+      <div class="feats" id="feats"></div>
+      <div class="status" id="refStatus"><span class="pulse load"></span><span>Loading reference annotations…</span></div>
+      <div class="warn" id="exclWarn" hidden></div>
+      <label class="check" style="margin-top:14px"><input type="checkbox" id="canonical">
+        <span>Canonical transcripts only<small>Restrict TSS and splice-site distances to Ensembl canonical transcripts.</small></span></label>
+      <details>
+        <summary>Add your own annotation files</summary>
+        <div class="extras">
+          <label class="extra"><span>BED intervals<small>Binary: does the variant overlap an interval?</small></span><span class="n" data-for="bed">Choose…</span><input type="file" id="bed" multiple></label>
+          <label class="extra"><span>Variant ID lists<small>Binary: is the variant in the list?</small></span><span class="n" data-for="variant_set">Choose…</span><input type="file" id="variant_set" multiple></label>
+          <label class="extra"><span>Score tables<small>Quantitative: two columns, variant and score.</small></span><span class="n" data-for="score">Choose…</span><input type="file" id="score" multiple></label>
+        </div>
+        <p class="hint" style="margin:10px 0 0">The file name (without extension) becomes the feature name.</p>
+      </details>
+
+      <div class="runbar">
+        <button type="submit" class="btn primary wide" id="run" disabled>Run QC</button>
+        <div class="msg" id="msg" role="alert"></div>
+        <div id="progress" aria-live="polite">
+          <div class="prog-row"><span id="progText">Annotating variants and computing enrichments…</span><span id="elapsed" class="mono">0s</span></div>
+          <div class="track"><div class="bar"></div></div>
+        </div>
+      </div>
+    </form>
+
+    <aside>
+      <div class="card side">
+        <h3>What gets compared</h3>
+        <ul>
+          <li><i class="sw" style="background:var(--g-high)"></i><span><b>high</b><br>Variants above the high-PIP threshold in at least one credible set: the likely causal ones.</span></li>
+          <li><i class="sw" style="background:var(--g-low-all)"></i><span><b>low_all</b><br>Variants below the low-PIP threshold in any credible set.</span></li>
+          <li><i class="sw" style="background:var(--g-low-anchored)"></i><span><b>low_anchored</b><br>Low-PIP variants from credible sets whose top variant is confidently resolved: the strictest background.</span></li>
+        </ul>
+      </div>
+      <div class="card side">
+        <h3>Reading the result</h3>
+        <p>Good fine-mapping shows high-PIP variants strongly enriched for open chromatin, missense and
+          replicating variants, and sitting closer to TSSs and splice sites. Weak enrichment hints at
+          miscalibrated PIPs or poor resolution.</p>
+      </div>
+      <div class="card side">
+        <h3>Privacy</h3>
+        <p>Uploaded files are processed in this Space and deleted automatically after two hours.
+          Don't upload data you aren't allowed to share with a third-party host.</p>
+      </div>
+    </aside>
+  </div>
+
+  <section id="results">
+    <div class="res-head">
+      <div><h2>Report</h2><p id="resMeta"></p></div>
+      <div class="actions">
+        <a class="btn" id="dlReport" href="#">Download report</a>
+        <a class="btn" id="dlZip" href="#">All tables &amp; figures (.zip)</a>
+        <a class="btn" id="openTab" href="#" target="_blank" rel="noopener">Open in new tab ↗</a>
+      </div>
+    </div>
+    <iframe id="frame" title="QC report"></iframe>
+  </section>
+</main>
+<footer class="in">finemap-qc · enrichment-based QC for fine-mapped credible sets</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const base = location.pathname.replace(/\/[^/]*$/, "/");
+let cfg = null, file = null, busy = false;
+
+function setFile(f) {
+  file = f;
+  $("drop").classList.toggle("has", !!f);
+  $("dropTitle").innerHTML = f ? `<span class="file">📄 ${f.name.replace(/[<>&]/g, "")}</span>` : "Drop a file here or click to browse";
+  $("dropSub").textContent = f ? `${(f.size / 1048576).toFixed(1)} MB · click to replace` : ".tsv, .tsv.gz or .txt";
+  refreshRun();
+}
+function refreshRun() {
+  const waiting = $("useRefs").checked && cfg && ["loading", "warming"].includes(cfg.refs_status);
+  $("run").disabled = busy || !file || waiting;
+  $("run").textContent = waiting && file ? "Waiting for reference annotations…" : "Run QC";
+  $("example").disabled = busy;
+}
+$("cs").addEventListener("change", e => setFile(e.target.files[0] || null));
+const drop = $("drop");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("cs").click(); } });
+for (const id of ["bed", "variant_set", "score"]) {
+  $(id).addEventListener("change", e => {
+    const n = e.target.files.length;
+    document.querySelector(`[data-for=${id}]`).textContent = n ? `${n} file${n > 1 ? "s" : ""}` : "Choose…";
+  });
+}
+$("useRefs").addEventListener("change", () => { renderRefs(); refreshRun(); });
+
+function tags(list) {
+  return list.map(f => `<span class="tag">${f.name}<i>${f.kind}</i></span>`).join("");
+}
+function renderRefs() {
+  if (!cfg) return;
+  const s = cfg.refs_status, on = $("useRefs").checked;
+  const st = $("refStatus"), dot = st.querySelector(".pulse"), txt = st.querySelector("span:last-child");
+  $("useRefs").disabled = s === "none";
+  if (s === "none") {
+    $("useRefs").checked = false;
+    $("refsNote").textContent = "No reference annotations are configured on this server. Add your own files below.";
+    st.hidden = true; $("feats").innerHTML = ""; return;
+  }
+  $("refsNote").textContent = cfg.refs_repo ? `From the ${cfg.refs_repo} dataset.` : "";
+  $("feats").innerHTML = on ? tags(cfg.features) : "";
+  $("feats").style.opacity = on ? 1 : .4;
+  st.hidden = s === "ready" || !on;
+  dot.className = "pulse " + (s === "error" ? "err" : s === "ready" ? "ok" : "load");
+  txt.textContent = s === "error" ? `Could not load reference annotations: ${cfg.refs_error}`
+    : s === "warming" ? "Indexing reference annotations…" : "Downloading reference annotations…";
+  const ex = cfg.excluded_studies || [];
+  $("exclWarn").hidden = !(on && cfg.features.some(f => f.name.startsWith("eqtlcat")));
+  $("exclWarn").innerHTML = `The <span class="mono">eqtlcat_*</span> replication sets exclude ${ex.length ? ex.map(x => `<span class="mono">${x}</span>`).join(", ") : "no studies"}. If your credible sets come from another eQTL Catalogue study, those enrichments are circular: untick the server annotations or treat them with care.`;
+}
+async function loadConfig() {
+  try {
+    cfg = await (await fetch(base + "api/config")).json();
+    renderRefs(); refreshRun();
+    if (["loading", "warming"].includes(cfg.refs_status)) setTimeout(loadConfig, 3000);
+  } catch (e) { setTimeout(loadConfig, 5000); }
+}
+loadConfig();
+
+function showError(t) { const m = $("msg"); m.className = "msg err"; m.textContent = t; }
+function clearError() { $("msg").className = "msg"; }
+
+async function start(useExample) {
+  clearError();
+  const fd = new FormData();
+  if (useExample) fd.append("use_example", "true"); else fd.append("credible_sets", file);
+  fd.append("high_pip", $("high").value); fd.append("low_pip", $("low").value); fd.append("anchor_pip", $("anchor").value);
+  fd.append("canonical_only", $("canonical").checked); fd.append("use_refs", $("useRefs").checked);
+  if (!useExample) for (const id of ["bed", "variant_set", "score"]) for (const f of $(id).files) fd.append(id, f);
+  busy = true; refreshRun();
+  $("progress").style.display = "block"; $("progText").textContent = useExample ? "Running on the example dataset…" : "Uploading…";
+  const t0 = Date.now(), tick = setInterval(() => { $("elapsed").textContent = Math.round((Date.now() - t0) / 1000) + "s"; }, 500);
+  try {
+    const r = await fetch(base + "api/run", { method: "POST", body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || "Request failed");
+    $("progText").textContent = "Annotating variants and computing enrichments…";
+    let s;
+    do {
+      await new Promise(res => setTimeout(res, 1200));
+      s = await (await fetch(base + "api/runs/" + j.id)).json();
+      if (s.status === "queued") $("progText").textContent = "Waiting for another run to finish…";
+      else if (s.status === "running") $("progText").textContent = "Annotating variants and computing enrichments…";
+    } while (!["done", "error"].includes(s.status));
+    if (s.status === "error") throw new Error(s.error || "The run failed.");
+    showResults(j.id, s);
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    clearInterval(tick); busy = false; refreshRun(); $("progress").style.display = "none";
+  }
+}
+function showResults(id, s) {
+  const url = base + "runs/" + id + "/report.html";
+  $("frame").src = url; $("openTab").href = url;
+  $("dlReport").href = base + "runs/" + id + "/report-download";
+  $("dlZip").href = base + "runs/" + id + "/results.zip";
+  $("resMeta").textContent = `${s.name} · finished in ${s.elapsed}s · kept for 2 hours`;
+  $("results").style.display = "block";
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+$("frame").addEventListener("load", () => {
+  try { const d = $("frame").contentDocument; $("frame").style.height = Math.max(600, d.documentElement.scrollHeight + 2) + "px"; } catch (e) {}
+});
+$("form").addEventListener("submit", e => { e.preventDefault(); if (file) start(false); });
+$("example").addEventListener("click", () => start(true));
+</script>
+</body>
+</html>
