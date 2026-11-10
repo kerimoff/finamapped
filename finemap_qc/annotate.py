@@ -1,4 +1,6 @@
 """Variant annotation: distances to gene features and interval overlaps."""
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
 
@@ -7,6 +9,7 @@ def _attr(attrs, key):
     return attrs.str.extract(rf'{key} "([^"]+)"', expand=False)
 
 
+@lru_cache(maxsize=4)  # the web app reuses parsed reference files between runs
 def load_gene_features(gtf_path, canonical_only=False):
     """Extract TSS and splice-site positions of protein-coding transcripts from a GENCODE GTF.
 

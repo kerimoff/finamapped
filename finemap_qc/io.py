@@ -3,6 +3,8 @@
 All variant IDs are normalised to ``chr{chrom}_{pos}_{ref}_{alt}`` so that
 files using ``1_123_A_G``, ``chr1:123:A:G`` or ``1-123-A-G`` all match.
 """
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
 
@@ -62,6 +64,7 @@ def read_credible_sets(path):
     return df
 
 
+@lru_cache(maxsize=16)
 def read_bed(path):
     """Read the first three columns of a BED file into {chrom: (sorted starts, cumulative max ends)}."""
     bed = pd.read_csv(path, sep="\t", header=None, usecols=[0, 1, 2], comment="#",

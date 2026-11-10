@@ -4,11 +4,46 @@ Quality metrics for fine-mapped credible sets in eQTL Catalogue format. The tool
 high-PIP variants (PIP > 0.8) are enriched for features that true causal variants tend to have,
 compared with low-PIP variants.
 
-## Install
+## Quick start
 
 ```bash
-pip install -e .            # or: pip install pandas numpy scipy matplotlib
+git clone https://github.com/kerimoff/finamapped.git && cd finamapped
+git checkout claude/gallant-knuth-tzv77n
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -e ".[app,test]"
+streamlit run app.py                                     # opens http://localhost:8501
 ```
+
+In the web app, upload a credible sets file, or click **Run on example data**. The results appear in tabs, and you can download the HTML report or a zip of all outputs.
+
+The same analysis is also available from the command line:
+
+```bash
+finemap-qc --credible-sets examples/credible_sets.tsv.gz --gtf examples/genes.gtf.gz \
+  --bed open_chromatin=examples/open_chromatin.bed --variant-set missense=examples/missense.txt \
+  --score spliceai=examples/spliceai.tsv --out qc_out
+```
+
+### Example data
+
+`examples/` holds a **simulated** dataset (fake genes on chr1–3) produced by `examples/make_example.py`. Causal variants were planted near TSSs, at splice sites, in open chromatin and on missense positions, so the report shows clear enrichments. It is for demos and testing only; do not draw biological conclusions from it.
+
+### Web app reference annotations
+
+Users upload only their credible sets. The reference annotations stay on the server and are listed in a JSON file, set via `FINEMAP_QC_REFS` (default: `examples/references.json`). Paths in the file are relative to the file itself:
+
+```json
+{"gtf": "gencode.v46.basic.annotation.gtf.gz",
+ "bed": {"encode_ccre": "GRCh38-cCREs.bed"},
+ "variant_set": {"missense": "missense.txt", "eqtlcat_rep": "eqtlcat_ge_rep.txt"},
+ "score": {"spliceai": "spliceai.tsv"}}
+```
+
+```bash
+FINEMAP_QC_REFS=/data/refs/references.json streamlit run app.py
+```
+
+Parsed GTF and BED files are cached in memory between runs, so only the first run pays the cost of loading the full GENCODE GTF (tens of seconds). Users can also upload extra annotation files in the sidebar.
 
 ## Input
 

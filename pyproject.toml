@@ -7,6 +7,7 @@ dependencies = ["pandas>=1.5", "numpy>=1.23", "scipy>=1.9", "matplotlib>=3.5"]
 
 [project.optional-dependencies]
 test = ["pytest"]
+app = ["streamlit>=1.40"]
 
 [project.scripts]
 finemap-qc = "finemap_qc.cli:main"

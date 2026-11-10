@@ -1,0 +1,12 @@
+{
+  "gtf": "genes.gtf.gz",
+  "bed": {
+    "open_chromatin": "open_chromatin.bed"
+  },
+  "variant_set": {
+    "missense": "missense.txt"
+  },
+  "score": {
+    "spliceai": "spliceai.tsv"
+  }
+}
