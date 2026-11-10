@@ -12,7 +12,8 @@ import pandas as pd
 def normalize_variant_ids(ids):
     """Return a DataFrame with columns variant, chrom, pos (NaN rows for unparsable IDs)."""
     parts = pd.Series(ids, dtype=str).str.split(r"[_:\-]", n=3, regex=True, expand=True)
-    parts = parts.reindex(columns=range(4))
+    # object dtype keeps .str usable when input is empty or no ID splits into 4 parts
+    parts = parts.reindex(columns=range(4)).astype(object)
     chrom = parts[0].str.replace(r"^chr", "", regex=True)
     pos = pd.to_numeric(parts[1], errors="coerce")
     ok = parts.notna().all(axis=1) & pos.notna()
