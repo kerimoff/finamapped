@@ -107,17 +107,36 @@ Each group counts unique variants. A variant that is high-PIP in any credible se
 
 ## Reference data
 
-Downloading is not automated. Sources I suggest:
+### Downloaded automatically
 
-* **Gene model:** GENCODE basic GTF, e.g. `https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/gencode.v46.basic.annotation.gtf.gz`
-* **Open chromatin:** ENCODE SCREEN cCREs (`GRCh38-cCREs.bed`), or a union of ENCODE DNase/ATAC peaks for relevant cell types. The plain cCRE BED is very broad (about 8% of the genome), so a tissue-matched set will discriminate better.
-* **Missense:** run VEP once on the union of your input variants and keep `missense_variant`. This is cheaper and more exact than any genome-wide list.
-* **Replicating fine-mapped variants:** use `scripts/build_replicating_set.py`. It keeps variants with PIP > 0.8 in at least 2 input files, and each file counts as one study:
+```bash
+python scripts/download_references.py --out-dir refs --exclude-study QTS000001
+```
+```bash
+FINEMAP_QC_REFS=refs/references.json streamlit run app.py
+```
+
+The script fetches:
+
+* **Gene model:** GENCODE basic GTF, release 46 by default (`--gencode-release`). About 50 MB.
+* **Open chromatin:** ENCODE SCREEN cCREs, V3 registry (`--ccre-url` to use another file). The cCRE set is broad (about 8% of the genome), so tissue-matched DNase/ATAC peaks will discriminate better; pass those with `--bed` or add them to `references.json`.
+* **Replicating eQTL Catalogue variants:** for each quantification method (`--eqtlcat-quant`, default `ge leafcutter`), the variants with PIP > 0.8 in at least 2 distinct studies. All datasets (tissues, conditions) of one study count as a single study. The script streams every credible set file from the EBI FTP and caches only the variants with PIP > 0.5 under `refs/eqtl_catalogue/`. The first run downloads all 280 `ge` and 113 `leafcutter` datasets, which takes a while. Re-runs with a different `--pip` (≥ 0.5), `--min-studies` or `--exclude-study` use the cache.
+* **`references.json`:** the file the app and the CLI read. It also records which studies were excluded.
+
+**Always pass `--exclude-study` with the eQTL Catalogue study ID of the dataset you are evaluating.** Otherwise the `eqtlcat_*` enrichments are circular. To evaluate a different study, re-run the script with that study's ID; it only takes seconds thanks to the cache.
+
+The eQTL Catalogue has no MAJIQ quantifications, so those replicating sets can't be scripted.
+
+### Manual steps
+
+* **Missense:** run VEP once on the union of your input variants, keep the `missense_variant` ones, and add the list as a `variant_set`. This is cheaper and more exact than any genome-wide list.
+* **Other fine-mapping resources (FinnGen, Open Targets, Tambets et al.):** download the files you want, then build a replicating set with `scripts/build_replicating_set.py`. Each input file counts as one study:
   ```bash
-  python scripts/build_replicating_set.py --min-studies 2 --out eqtlcat_ge_rep.txt QTD*.credible_sets.tsv.gz
   python scripts/build_replicating_set.py --variant-col rsid --pip-col prob --out finngen_rep.txt *.SUSIE.snp.bgz
   ```
-* **SpliceAI / ChromBPNet / AlphaGenome:** precompute these for the union of input variants and pass them as `--score` tables.
+* **SpliceAI / ChromBPNet / AlphaGenome:** precompute these for the union of your input variants and add them as `score` tables (variant, score). The precomputed SpliceAI files require an Illumina login.
+
+Add the files from the manual steps to `refs/references.json` (paths relative to that file). Re-running the download script keeps entries it didn't create.
 
 ## Caveats (read before interpreting numbers)
 
