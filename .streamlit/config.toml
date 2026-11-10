@@ -1,5 +1,9 @@
 [server]
+address = "localhost"   # local only: not reachable from other machines on the network
 maxUploadSize = 1000
+
+[client]
+toolbarMode = "minimal" # hide Streamlit's Deploy button
 
 [browser]
 gatherUsageStats = false

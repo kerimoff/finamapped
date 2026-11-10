@@ -11,7 +11,7 @@ git clone https://github.com/kerimoff/finamapped.git && cd finamapped
 git checkout claude/gallant-knuth-tzv77n
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[app,test]"
-streamlit run app.py                                     # opens http://localhost:8501
+streamlit run app.py                                     # opens http://localhost:8501 (local only)
 ```
 
 In the web app, upload a credible sets file, or click **Run on example data**. The results appear in tabs, and you can download the HTML report or a zip of all outputs.
