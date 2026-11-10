@@ -1,0 +1,19 @@
+[project]
+name = "finemap-qc"
+version = "0.1.0"
+description = "Quality metrics for fine-mapped credible sets (eQTL Catalogue format)"
+requires-python = ">=3.9"
+dependencies = ["pandas>=1.5", "numpy>=1.23", "scipy>=1.9", "matplotlib>=3.5"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+finemap-qc = "finemap_qc.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["finemap_qc"]
