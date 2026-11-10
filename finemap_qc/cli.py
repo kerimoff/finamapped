@@ -89,8 +89,9 @@ def main(argv=None):
     images = {"descriptive": [out("cs_sizes.png")], "binary": [], "quantitative": []}
     report.plot_cs_sizes(per_cs, images["descriptive"][0])
     if binary:
-        images["binary"].append(out("binary_features.png"))
-        report.plot_binary(bin_tab, images["binary"][0])
+        images["binary"] += [out("forest.png"), out("binary_features.png")]
+        report.plot_forest(bin_tab, images["binary"][0])
+        report.plot_binary(bin_tab, images["binary"][1])
     for f in quant:
         path = out(f"hist_{f}.png")
         report.plot_quantitative(annot, groups, f, path, log_distance=f.startswith("dist_"))
