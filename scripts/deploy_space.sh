@@ -2,7 +2,9 @@
 # Deploy the web app to a Hugging Face Space.
 #   scripts/deploy_space.sh <user>/<space> [<user>/<refs-dataset>]
 # With a dataset ID, refs/ (built by scripts/download_references.py) is uploaded to it first,
-# and the Space is pointed at it. Requires `hf auth login`.
+# and the Space is pointed at it. Requires `hf auth login` (or HF_TOKEN).
+# CODE_ONLY=1 only uploads the app code to an existing, configured Space (used by CI, so a
+# token with write access to just that Space is enough).
 set -euo pipefail
 SPACE=${1:?usage: deploy_space.sh <user>/<space> [<user>/<refs-dataset>]}
 REFS=${2:-}
@@ -14,7 +16,7 @@ if [ -n "$REFS" ]; then
   hf upload "$REFS" refs . --repo-type dataset --exclude "eqtl_catalogue/**" --commit-message "Update reference annotations"
 fi
 
-hf repos create "$SPACE" --type space --space-sdk gradio --flavor zero-a10g --exist-ok
+[ "${CODE_ONLY:-0}" = 1 ] || hf repos create "$SPACE" --type space --space-sdk gradio --flavor zero-a10g --exist-ok
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 cp space/app.py space/index.html space/requirements.txt space/README.md "$STAGE"/
@@ -22,7 +24,9 @@ cp -R finemap_qc "$STAGE"/finemap_qc
 mkdir "$STAGE"/examples
 cp examples/credible_sets.tsv.gz examples/genes.gtf.gz examples/open_chromatin.bed examples/missense.txt \
    examples/spliceai.tsv examples/references.json "$STAGE"/examples/
-hf spaces variables add "$SPACE" --env GRADIO_SSR_MODE=false
-[ -n "$REFS" ] && hf spaces variables add "$SPACE" --env FINEMAP_QC_REFS_REPO="$REFS"
+if [ "${CODE_ONLY:-0}" != 1 ]; then
+  hf spaces variables add "$SPACE" --env GRADIO_SSR_MODE=false
+  if [ -n "$REFS" ]; then hf spaces variables add "$SPACE" --env FINEMAP_QC_REFS_REPO="$REFS"; fi
+fi
 hf upload "$SPACE" "$STAGE" . --repo-type space --exclude "**/__pycache__/**" --commit-message "Deploy finemap-qc"
 echo "Deployed: https://huggingface.co/spaces/$SPACE"

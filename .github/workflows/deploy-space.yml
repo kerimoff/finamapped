@@ -50,6 +50,7 @@ jobs:
       - name: Deploy
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          CODE_ONLY: "1" # Space already exists and is configured; token only needs write on it
         run: |
           if [ -z "$HF_TOKEN" ]; then echo "::error::Add the HF_TOKEN repository secret"; exit 1; fi
           scripts/deploy_space.sh "$SPACE_ID"
