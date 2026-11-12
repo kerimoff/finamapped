@@ -1,0 +1,55 @@
+# Deploy the web app to the Hugging Face Space on every push to the default branch.
+# Needs a repository secret HF_TOKEN: a Hugging Face token with write access to the Space.
+# Reference annotations (refs/) are not in git; update the dataset manually with
+#   scripts/deploy_space.sh kerimov/finemap-qc kerimov/finemap-qc-refs
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches: [claude/gallant-knuth-tzv77n]
+    paths:
+      - "space/**"
+      - "finemap_qc/**"
+      - "examples/**"
+      - "scripts/deploy_space.sh"
+      - ".github/workflows/deploy-space.yml"
+  workflow_dispatch: # "Run workflow" button in the Actions tab
+
+concurrency:
+  group: deploy-space
+  cancel-in-progress: true
+
+env:
+  SPACE_ID: kerimov/finemap-qc
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        # gradio + httpx let tests/test_space.py run instead of being skipped
+        run: pip install -e ".[test]" "gradio==6.31.0" httpx
+      - name: Test
+        run: python -m pytest -q tests
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Hugging Face CLI
+        run: pip install "huggingface_hub==2.4.0"
+      - name: Deploy
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then echo "::error::Add the HF_TOKEN repository secret"; exit 1; fi
+          scripts/deploy_space.sh "$SPACE_ID"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Download the reference annotations that can be fetched automatically, and write references.json.
 
-    python scripts/download_references.py --out-dir refs --exclude-study QTS000001
+    python scripts/download_references.py --out-dir refs
     FINEMAP_QC_REFS=refs/references.json streamlit run app.py
 
 What it fetches:
@@ -18,11 +18,13 @@ eQTL Catalogue files are streamed: only variants with PIP > 0.5 are cached per
 dataset (refs/eqtl_catalogue/*.tsv), so re-running with another --pip >= 0.5,
 --min-studies or --exclude-study is fast and needs no new downloads.
 
-IMPORTANT: pass --exclude-study for the study you are evaluating, otherwise the
-eqtlcat_* enrichments are circular.
+The tool is meant for fine-mapping results from outside the eQTL Catalogue, so by
+default every study is used. Pass --exclude-study only when evaluating a dataset
+that is already in the eQTL Catalogue; otherwise its eqtlcat_* enrichments are circular.
 """
 import argparse
 import json
+import hashlib
 import sys
 import time
 import urllib.request
@@ -31,7 +33,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from finemap_qc.io import normalize_variant_ids  # noqa: E402
+from finemap_qc.references import high_pip_variants  # noqa: E402
 
 GENCODE_URL = ("https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/"
                "release_{r}/gencode.v{r}.basic.annotation.gtf.gz")
@@ -64,9 +66,14 @@ def download(url, dest):
 
 def eqtl_catalogue(out_dir, metadata, quant_methods, pip, min_studies, exclude):
     """Return {quant_method: path of replicating variant list}."""
-    if pip < CACHE_PIP:
-        sys.exit(f"--pip must be >= {CACHE_PIP} (the cache threshold)")
+    if not CACHE_PIP <= pip <= 1 or min_studies < 2:
+        raise ValueError(f"require {CACHE_PIP} <= pip <= 1 and min_studies >= 2")
     meta = retry(lambda: pd.read_csv(metadata, sep="\t", dtype=str))
+    required = {"study_id", "dataset_id", "quant_method", "ftp_cs_path"}
+    if not required <= set(meta.columns) or meta[list(required)].isna().any().any():
+        raise ValueError("metadata missing required dataset/study/quantification/URL fields")
+    if meta["dataset_id"].duplicated().any():
+        raise ValueError("duplicate dataset IDs in metadata")
     cache = out_dir / "eqtl_catalogue"
     cache.mkdir(exist_ok=True)
     out = {}
@@ -78,21 +85,32 @@ def eqtl_catalogue(out_dir, metadata, quant_methods, pip, min_studies, exclude):
         print(f"  {quant}: {len(rows)} datasets from {rows['study_id'].nunique()} studies")
         study_hits = {}
         for i, r in enumerate(rows.itertuples(), 1):
-            f = cache / f"{r.dataset_id}.tsv"
+            url = r.ftp_cs_path.replace("ftp://", "https://", 1)
+            identity = hashlib.sha256(f"v2|{url}|{CACHE_PIP}".encode()).hexdigest()[:16]
+            f = cache / f"{r.dataset_id}.{identity}.tsv"
             if not f.exists():
-                url = r.ftp_cs_path.replace("ftp://", "https://", 1)
                 print(f"    [{i}/{len(rows)}] {r.dataset_id} ({r.study_label}, {r.sample_group})")
                 df = retry(lambda: pd.read_csv(url, sep="\t", usecols=["variant", "pip"],
                                                compression="gzip" if url.endswith(".gz") else "infer"))
-                df[df["pip"] > CACHE_PIP].to_csv(f, sep="\t", index=False)
+                high_pip_variants(df, CACHE_PIP)  # reject malformed source data before caching
+                tmp = f.with_suffix(".part")
+                df[pd.to_numeric(df["pip"]) > CACHE_PIP].to_csv(tmp, sep="\t", index=False)
+                tmp.replace(f)
             df = pd.read_csv(f, sep="\t")
-            hits = set(normalize_variant_ids(df.loc[df["pip"] > pip, "variant"])["variant"].dropna())
+            hits = high_pip_variants(df, pip)
             study_hits.setdefault(r.study_id, set()).update(hits)
         counts = pd.Series([v for hits in study_hits.values() for v in hits]).value_counts()
         keep = sorted(counts.index[counts >= min_studies])
         path = out_dir / f"eqtlcat_{quant}_rep.txt"
         path.write_text("".join(v + "\n" for v in keep))
         print(f"  {quant}: {len(keep):,} variants with PIP > {pip} in >= {min_studies} studies -> {path}")
+        provenance = {"metadata": str(metadata), "quant_method": quant,
+                      "pip_strictly_greater_than": pip, "min_studies": min_studies,
+                      "excluded_studies": sorted(exclude), "cache_threshold": CACHE_PIP,
+                      "datasets": rows[["study_id", "dataset_id", "ftp_cs_path"]].to_dict("records"),
+                      "output_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                      "interpretation": "Exact-variant recurrence across study IDs; not proof of independent cohorts or same-trait replication."}
+        path.with_suffix(".provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
         out[f"eqtlcat_{quant}_rep"] = path.name
     return out
 

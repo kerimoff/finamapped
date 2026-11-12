@@ -22,23 +22,26 @@ def load_gene_features(gtf_path, canonical_only=False):
                       names=["chrom", "feature", "start", "end", "strand", "attrs"],
                       dtype={"chrom": str})
     gtf = gtf[gtf["feature"].isin(["transcript", "exon"])]
-    keep = (gtf["attrs"].str.contains('gene_type "protein_coding"', regex=False)
-            & gtf["attrs"].str.contains('transcript_type "protein_coding"', regex=False))
-    if canonical_only:
-        keep &= gtf["attrs"].str.contains('tag "Ensembl_canonical"', regex=False)
-    gtf = gtf[keep].copy()
     gtf["chrom"] = gtf["chrom"].str.replace(r"^chr", "", regex=True)
     gtf["tx"] = _attr(gtf["attrs"], "transcript_id")
-
     tx = gtf[gtf["feature"] == "transcript"]
+    keep = (tx["attrs"].str.contains('gene_type "protein_coding"', regex=False)
+            & tx["attrs"].str.contains('transcript_type "protein_coding"', regex=False))
+    if canonical_only:
+        keep &= tx["attrs"].str.contains('tag "Ensembl_canonical"', regex=False)
+    tx = tx[keep]
+    # Transcript selection controls exon selection; tags need not be repeated on exons.
+    gtf = gtf[gtf["tx"].isin(tx["tx"])]
     tss = pd.DataFrame({"chrom": tx["chrom"], "pos": np.where(tx["strand"] == "+", tx["start"], tx["end"])})
 
     ex = gtf[gtf["feature"] == "exon"]
-    tx_start = ex.groupby("tx")["start"].transform("min")
-    tx_end = ex.groupby("tx")["end"].transform("max")
+    ex = ex.drop_duplicates(["tx", "chrom", "start", "end"]).sort_values(["tx", "start", "end"])
+    next_start = ex.groupby("tx")["start"].shift(-1)
+    # Only adjacent exons separated by an intron define splice boundaries.
+    junction = next_start > ex["end"] + 1
     splice = pd.concat([
-        pd.DataFrame({"chrom": ex["chrom"], "pos": ex["start"]})[ex["start"] != tx_start],
-        pd.DataFrame({"chrom": ex["chrom"], "pos": ex["end"]})[ex["end"] != tx_end],
+        pd.DataFrame({"chrom": ex.loc[junction, "chrom"], "pos": ex.loc[junction, "end"]}),
+        pd.DataFrame({"chrom": ex.loc[junction, "chrom"], "pos": next_start[junction].astype("int64")}),
     ])
 
     def by_chrom(df):
