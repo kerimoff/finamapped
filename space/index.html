@@ -82,7 +82,7 @@ summary:hover{color:var(--ink-1)}
 .extra{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13.5px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunken)}
 .extra small{display:block;color:var(--ink-3);font-size:12px}
 .extra .n{font-size:12.5px;color:var(--accent);font-weight:600}
-.warn{font-size:13px;color:var(--ink-2);background:var(--sunken);border:1px solid var(--line);border-left:3px solid var(--g-low-all);border-radius:10px;padding:10px 12px;margin:12px 0 0 34px}
+.warn{font-size:13px;color:var(--ink-2);background:var(--sunken);border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:10px;padding:10px 12px;margin:12px 0 0 34px}
 .side h3{font-size:14.5px;margin:0 0 10px;font-weight:640}
 .side ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .side li{display:flex;gap:10px;font-size:13.5px;color:var(--ink-2)}
@@ -134,8 +134,8 @@ footer.in{color:var(--ink-3);font-size:12.5px;padding-top:36px;padding-bottom:40
         <span id="dropSub">.tsv, .tsv.gz or .txt</span>
         <input type="file" id="cs" accept=".tsv,.gz,.txt,.csv">
       </label>
-      <label class="check"><input type="checkbox" id="collapseDuplicates">
-        <span>Collapse repeated variant rows<small>For Catalogue rsID aliases. PIP, trait and locus values must agree; the report records removed rows.</small></span></label>
+      <label class="check"><input type="checkbox" id="collapseDuplicates" checked>
+        <span>Collapse repeated variant rows<small>eQTL Catalogue files list a variant once per rsID; identical rows are merged. Rows with conflicting PIP, trait or locus are still rejected, and the report records how many rows were merged.</small></span></label>
       <div class="or">or</div>
       <button type="button" class="btn wide" id="example">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>
@@ -272,7 +272,7 @@ function renderRefs() {
     : s === "warming" ? "Indexing reference annotations…" : "Downloading reference annotations…";
   const ex = cfg.excluded_studies || [];
   $("exclWarn").hidden = !(on && cfg.features.some(f => f.name.startsWith("eqtlcat")));
-  $("exclWarn").innerHTML = `The <span class="mono">eqtlcat_*</span> replication sets exclude ${ex.length ? ex.map(x => `<span class="mono">${x}</span>`).join(", ") : "no studies"}. If your credible sets come from another eQTL Catalogue study, those enrichments are circular: untick the server annotations or treat them with care.`;
+  $("exclWarn").innerHTML = `<span class="mono">eqtlcat_*</span>: variants with PIP &gt; 0.8 in at least 2 eQTL Catalogue studies${ex.length ? ` (excluding ${ex.map(x => `<span class="mono">${x}</span>`).join(", ")})` : ""}.`;
 }
 async function loadConfig() {
   try {

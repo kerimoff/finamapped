@@ -85,8 +85,20 @@ def read_credible_sets(path, duplicate_policy="error"):
     removed = 0
     if duplicates.any():
         collapsed = df.drop_duplicates()
-        if duplicate_policy == "error" or collapsed.duplicated(["cs_id", "variant"]).any():
-            raise ValueError("duplicate credible-set/variant rows; only identical analysis rows may be explicitly collapsed")
+        conflicting = collapsed.duplicated(["cs_id", "variant"], keep=False)
+        if conflicting.any():
+            ex = collapsed.loc[conflicting].iloc[0]
+            raise ValueError(
+                f"duplicate credible-set/variant rows with conflicting values: {conflicting.sum()} rows, "
+                f"e.g. {ex['variant']} in {ex['cs_id']} (PIP, trait or locus differ). Each variant must "
+                "appear once per credible set.")
+        if duplicate_policy == "error":
+            ex = df.loc[duplicates].iloc[0]
+            raise ValueError(
+                f"duplicate credible-set/variant rows: {int(duplicates.sum())} repeated rows, e.g. "
+                f"{ex['variant']} in {ex['cs_id']}. eQTL Catalogue files list a variant once per rsID; "
+                "the rows are otherwise identical and can be merged with --duplicate-policy collapse-identical "
+                "(web app: 'Collapse repeated variant rows').")
         removed = len(df) - len(collapsed)
         df = collapsed.reset_index(drop=True)
     df.attrs["duplicate_rows_removed"] = removed

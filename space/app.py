@@ -131,6 +131,7 @@ def _execute(rid, argv):
             r["status"], r["error"] = "error", str(e)
         except Exception as e:
             r["status"], r["error"] = "error", (
+                str(e) if isinstance(e, ValueError) else
                 f"Could not process the input ({type(e).__name__}: {e}). Check that the credible sets file "
                 "is tab-separated with cs_id, variant and pip columns, and that annotation files match "
                 "the formats described above.")
@@ -160,7 +161,7 @@ def config():
 @app.post("/api/run")
 def start_run(credible_sets: UploadFile = File(None), use_example: bool = Form(False),
               high_pip: float = Form(0.8), low_pip: float = Form(0.05), anchor_pip: float = Form(0.5),
-              canonical_only: bool = Form(False), collapse_duplicates: bool = Form(False), use_refs: bool = Form(True),
+              canonical_only: bool = Form(False), collapse_duplicates: bool = Form(True), use_refs: bool = Form(True),
               bed: list[UploadFile] = File(None), variant_set: list[UploadFile] = File(None),
               score: list[UploadFile] = File(None)):
     _cleanup()

@@ -71,7 +71,7 @@ with st.sidebar:
             ref_cli_args = []
     else:
         st.warning(f"No reference file found at {REFS}")
-    collapse_duplicates = st.checkbox("Collapse identical credible-set/variant rows (Catalogue rsID aliases)", value=False)
+    collapse_duplicates = st.checkbox("Collapse identical credible-set/variant rows (Catalogue rsID aliases)", value=True)
     canonical = st.checkbox("GTF: canonical transcripts only", value=False)
 
     with st.expander("Add your own annotation files"):

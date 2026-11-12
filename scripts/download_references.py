@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Download the reference annotations that can be fetched automatically, and write references.json.
 
-    python scripts/download_references.py --out-dir refs --exclude-study QTS000001
+    python scripts/download_references.py --out-dir refs
     FINEMAP_QC_REFS=refs/references.json streamlit run app.py
 
 What it fetches:
@@ -18,8 +18,9 @@ eQTL Catalogue files are streamed: only variants with PIP > 0.5 are cached per
 dataset (refs/eqtl_catalogue/*.tsv), so re-running with another --pip >= 0.5,
 --min-studies or --exclude-study is fast and needs no new downloads.
 
-IMPORTANT: pass --exclude-study for the study you are evaluating, otherwise the
-eqtlcat_* enrichments are circular.
+The tool is meant for fine-mapping results from outside the eQTL Catalogue, so by
+default every study is used. Pass --exclude-study only when evaluating a dataset
+that is already in the eQTL Catalogue; otherwise its eqtlcat_* enrichments are circular.
 """
 import argparse
 import json

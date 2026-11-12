@@ -25,8 +25,9 @@ def test_space_duplicate_option_and_report(tmp_path, monkeypatch):
     client = TestClient(module.app)
     assert client.get('/').status_code == 200
     fixture=(root/'tests/data/QTD000001.one_cs.tsv').read_bytes()
-    for collapse, expected in [('false','error'),('true','done')]:
-        response=client.post('/api/run', data={'use_refs':'false','collapse_duplicates':collapse},
+    for collapse, expected in [('false','error'),('true','done'),(None,'done')]:  # None: default merges
+        data={'use_refs':'false'} | ({} if collapse is None else {'collapse_duplicates':collapse})
+        response=client.post('/api/run', data=data,
                              files={'credible_sets':('cs.tsv',fixture,'text/tab-separated-values')})
         assert response.status_code==200
         rid=response.json()['id']

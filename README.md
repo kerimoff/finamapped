@@ -114,7 +114,7 @@ Each group counts unique variants. A variant that is high-PIP in any credible se
 ### Downloaded automatically
 
 ```bash
-python scripts/download_references.py --out-dir refs --exclude-study QTS000001
+python scripts/download_references.py --out-dir refs
 ```
 ```bash
 FINEMAP_QC_REFS=refs/references.json streamlit run app.py
@@ -127,7 +127,7 @@ The script fetches:
 * **Replicating eQTL Catalogue variants:** for each quantification method (`--eqtlcat-quant`, default `ge leafcutter`), the variants with PIP > 0.8 in at least 2 distinct studies. All datasets (tissues, conditions) of one study count as a single study. The script reads each credible set file from the EBI FTP and caches only the variants with PIP > 0.5 under `refs/eqtl_catalogue/`. The first run downloads all selected datasets in the metadata, which can take a while. Re-runs with a different `--pip` (≥ 0.5), `--min-studies` or `--exclude-study` use the cache.
 * **`references.json`:** the file the app and the CLI read. It also records which studies were excluded.
 
-**Always pass `--exclude-study` with the eQTL Catalogue study ID of the dataset you are evaluating.** Otherwise the `eqtlcat_*` enrichments are circular. To evaluate a different study, re-run the script with that study's ID; it only takes seconds thanks to the cache.
+finemap-qc is meant for fine-mapping results from outside the eQTL Catalogue (for example, a dataset submitted for inclusion), so the replicating sets use every study by default. To evaluate a dataset that is already in the eQTL Catalogue, re-run the script with `--exclude-study <QTS ID>` for that study; otherwise its `eqtlcat_*` enrichments are circular. Thanks to the cache this takes seconds.
 
 The eQTL Catalogue has no MAJIQ quantifications, so those replicating sets can't be scripted.
 
@@ -144,7 +144,7 @@ Add the files from the manual steps to `refs/references.json` (paths relative to
 
 ## Caveats (read before interpreting numbers)
 
-* **Circularity.** If the input is an eQTL Catalogue dataset, leave that dataset out of the eQTL Catalogue replicating set. Treat the same study and its tissues the same way, or the enrichment is inflated by construction.
+* **Circularity (eQTL Catalogue inputs only).** External datasets are not affected. If the input is an eQTL Catalogue dataset, leave that dataset out of the eQTL Catalogue replicating set. Treat the same study and its tissues the same way, or the enrichment is inflated by construction.
 * **P-values are anti-conservative.** Low-PIP variants within a credible set are in LD and spatially clustered, so they are not independent observations. Compare datasets by fold enrichment, not p-values. The CLI and web apps now bootstrap clusters for intervals; Fisher and Mann–Whitney p-values remain exploratory independence-based calculations, without multiple-testing correction.
 * **`low_all` vs `low_anchored`.** `low_all` mixes in low-PIP variants from diffuse credible sets (weak or poorly resolved signals), which tend to sit in different genomic contexts. `low_anchored` restricts eligibility to anchored sets but is not a matched within-locus comparison; it can still be confounded.
 * **Small high-PIP sets.** A small dataset may have only tens of high-PIP variants, which makes the CIs wide.
