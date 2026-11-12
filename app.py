@@ -71,6 +71,7 @@ with st.sidebar:
             ref_cli_args = []
     else:
         st.warning(f"No reference file found at {REFS}")
+    collapse_duplicates = st.checkbox("Collapse identical credible-set/variant rows (Catalogue rsID aliases)", value=False)
     canonical = st.checkbox("GTF: canonical transcripts only", value=False)
 
     with st.expander("Add your own annotation files"):
@@ -90,6 +91,8 @@ if run_upload or run_example:
     cs_path = save_upload(upload, work, "credible_sets") if run_upload else EXAMPLE
     argv = ["--credible-sets", str(cs_path), "--out", str(work / "out"),
             "--high-pip", str(high), "--low-pip", str(low), "--anchor-pip", str(anchor)] + ref_cli_args
+    if collapse_duplicates:
+        argv += ["--duplicate-policy", "collapse-identical"]
     if canonical:
         argv.append("--canonical-only")
     for flag, files in (("--bed", extra_bed), ("--variant-set", extra_sets), ("--score", extra_scores)):

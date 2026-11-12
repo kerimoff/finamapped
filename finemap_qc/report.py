@@ -139,9 +139,10 @@ def plot_forest(table, path):
         r = t[t["comparison"] == comp].set_index("feature").reindex(feats)
         y = np.arange(len(feats))[::-1] + off
         fe = r["fold_enrichment"].to_numpy()
-        err = np.vstack([fe - r["fe_ci_low"].to_numpy(), r["fe_ci_high"].to_numpy() - fe])
-        ax.errorbar(fe, y, xerr=err, fmt="o", ms=6.5, lw=2, capsize=0, color=COLORS.get(g, NEUTRAL),
-                    mec=SURFACE, mew=1.5, label=f"high vs {g}")
+        # Percentile intervals need not contain the point estimate.
+        ax.hlines(y, r["fe_ci_low"], r["fe_ci_high"], color=COLORS.get(g, NEUTRAL), lw=2)
+        ax.plot(fe, y, "o", ms=6.5, color=COLORS.get(g, NEUTRAL),
+                mec=SURFACE, mew=1.5, label=f"high vs {g}")
     ax.axvline(1, color=INK_2, lw=1, ls=(0, (4, 3)))
     ax.set_xscale("log")
     lo = np.nanmin(t["fe_ci_low"]) if len(t) else 0.5
@@ -300,7 +301,7 @@ def _feature_rows(df):
 def _binary_table(df):
     head = ("<tr><th>Feature</th><th class='l'>Comparison</th><th>High-PIP overlap</th>"
             "<th>Low-PIP overlap</th><th>Fold enrichment <span class='u'>95% CI</span></th>"
-            "<th>Odds ratio</th><th>Fisher p</th></tr>")
+            "<th>CI status / clusters</th><th>Odds ratio</th><th>Fisher p (independence)</th></tr>")
     rows = []
     for r, feat, first in _feature_rows(df):
         rows.append(
@@ -308,14 +309,15 @@ def _binary_table(df):
             f"<td>{_pct(r['frac_high'])} <span class='u'>{_int(r['k_high'])}/{_int(r['n_high'])}</span></td>"
             f"<td>{_pct(r['frac_low'])} <span class='u'>{_int(r['k_low'])}/{_int(r['n_low'])}</span></td>"
             f"<td><b>{_num(r['fold_enrichment'])}</b> <span class='u'>{_num(r['fe_ci_low'])}–{_num(r['fe_ci_high'])}</span></td>"
-            f"<td>{_num(r['odds_ratio'])}</td><td{_sig(r['fisher_p'])}>{_p(r['fisher_p'])}</td></tr>")
+            f"<td>{html.escape(str(r.get('ci_status', 'independence')))} / {_int(r.get('n_clusters', 0))}</td>"
+            f"<td>{_num(r['odds_ratio'])}</td><td>{_p(r['fisher_p'])}</td></tr>")
     return f"<div class='tw'><table class='t'><thead>{head}</thead><tbody>{''.join(rows)}</tbody></table></div>"
 
 
 def _quant_table(df):
     head = ("<tr><th>Feature</th><th class='l'>Comparison</th><th>Median high <span class='u'>n</span></th>"
             "<th>Median low <span class='u'>n</span></th><th>Median ratio</th><th>Mean high</th>"
-            "<th>Mean low</th><th>Mann–Whitney p</th></tr>")
+            "<th>Mean low</th><th>Median difference (95% cluster CI)</th><th>CI status / clusters</th><th>Mann–Whitney p (independence)</th></tr>")
     rows = []
     for r, feat, first in _feature_rows(df):
         rows.append(
@@ -323,7 +325,9 @@ def _quant_table(df):
             f"<td><b>{_num(r['median_high'])}</b> <span class='u'>{_int(r['n_high'])}</span></td>"
             f"<td><b>{_num(r['median_low'])}</b> <span class='u'>{_int(r['n_low'])}</span></td>"
             f"<td>{_num(r['median_ratio'])}</td><td>{_num(r['mean_high'])}</td><td>{_num(r['mean_low'])}</td>"
-            f"<td{_sig(r['mannwhitney_p'])}>{_p(r['mannwhitney_p'])}</td></tr>")
+            f"<td>{_num(r['median_diff'])} ({_num(r.get('median_diff_ci_low', np.nan))}–{_num(r.get('median_diff_ci_high', np.nan))})</td>"
+            f"<td>{html.escape(str(r.get('ci_status', 'independence')))} / {_int(r.get('n_clusters', 0))}</td>"
+            f"<td>{_p(r['mannwhitney_p'])}</td></tr>")
     return f"<div class='tw'><table class='t'><thead>{head}</thead><tbody>{''.join(rows)}</tbody></table></div>"
 
 
@@ -526,15 +530,15 @@ def write_html(path, title, params, summary, binary, quant, images):
     if has_bin:
         parts += ["<section class='block' id='binary'><h2>Binary features</h2>"
                   "<p class='lede'>Does a feature (open chromatin, missense, replication…) occur more often among "
-                  "high-PIP variants than among low-PIP variants? Well-calibrated fine-mapping should show "
-                  "clear enrichment for functional features.</p>",
+                  "high-PIP variants than among low-PIP variants? Enrichment supports biological plausibility, not "
+                  "proof of causality or PIP calibration.</p>",
                   _binary_table(binary),
-                  "<p class='legend-sig'><i></i>p &lt; 0.05. Overlap shows the percentage with the count of "
+                  "<p class='legend-sig'>Overlap shows the percentage with the count of "
                   "overlapping / total unique variants. Fold enrichment = high-PIP overlap ÷ low-PIP overlap "
-                  "(95% Wald CI).</p>",
+                  "(95% cluster bootstrap CI; missing intervals indicate insufficient clusters or undefined replicates).</p>",
                   "<div class='note'>P-values treat variants as independent, so they are anti-conservative: "
-                  "low-PIP variants in the same credible set are in LD with each other. Read them as a "
-                  "ranking, not a calibrated test.</div>",
+                  "low-PIP variants in the same credible set are in LD with each other. These are exploratory, unadjusted tests, not a "
+                  "calibrated significance assessment. Cluster intervals assume independent clusters; shared-variant components do not capture all LD.</div>",
                   "<div class='figs'>" + "".join(_figure(p) for p in images.get("binary", [])) + "</div></section>"]
     if has_q:
         parts += ["<section class='block' id='quantitative'><h2>Quantitative features</h2>"
@@ -542,8 +546,10 @@ def write_html(path, title, params, summary, binary, quant, images):
                   "Causal variants are expected to sit closer to genes and splice sites and to score higher "
                   "on functional predictors.</p>",
                   _quant_table(quant),
-                  "<p class='legend-sig'><i></i>p &lt; 0.05 (two-sided Mann–Whitney U). Median ratio = "
-                  "median high ÷ median low.</p>",
+                  "<p class='legend-sig'>Mann–Whitney p-values assume independent variants. Median ratio = "
+                  "median high ÷ median low. Cluster intervals assume independent clusters; "
+                  "shared-variant components do not capture all LD. Missing intervals indicate "
+                  "insufficient clusters or undefined replicates; see exported valid-draw counts.</p>",
                   "<div class='figs'>" + "".join(_figure(p) for p in images.get("quantitative", [])) + "</div></section>"]
     prow = "".join(f"<div class='kv'><dt>{html.escape(str(k))}</dt><dd>{html.escape(str(v))}</dd></div>"
                    for k, v in params.items())

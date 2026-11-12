@@ -16,41 +16,58 @@ def normalize_variant_ids(ids):
     parts = parts.reindex(columns=range(4)).astype(object)
     chrom = parts[0].str.replace(r"^chr", "", regex=True)
     pos = pd.to_numeric(parts[1], errors="coerce")
-    ok = parts.notna().all(axis=1) & pos.notna()
+    ok = (parts.notna().all(axis=1) & np.isfinite(pos) & (pos > 0)
+          & (pos % 1 == 0) & (pos < 2**63)
+          & parts[1].str.fullmatch(r"[0-9]+", na=False)
+          & chrom.ne("") & parts[2].str.fullmatch(r"[ACGTNacgtn]+", na=False)
+          & parts[3].str.fullmatch(r"[ACGTNacgtn]+", na=False))
+    parts[1] = parts[1].str.lstrip("0")
+    parts[2] = parts[2].str.upper()
+    parts[3] = parts[3].str.upper()
     variant = ("chr" + chrom + "_" + parts[1] + "_" + parts[2] + "_" + parts[3]).where(ok)
     return pd.DataFrame({"variant": variant, "chrom": chrom.where(ok), "pos": pos.where(ok)})
 
 
-def _is_number(x):
-    try:
-        float(x)
-        return True
-    except (TypeError, ValueError):
-        return False
-
-
-def read_credible_sets(path):
+def read_credible_sets(path, duplicate_policy="error"):
     """Read credible sets.
 
     Uses columns named cs_id, variant, pip if present (so eQTL Catalogue
     *.credible_sets.tsv.gz files work directly); otherwise the first three
-    columns, with or without a header line.  If a molecular_trait_id column
+    headerless columns. Named headers must include cs_id, variant and pip.  If a molecular_trait_id column
     exists it is used to group credible sets by trait; otherwise the trait is
     the cs_id with a trailing ``_L<number>`` removed (eQTL Catalogue convention).
     """
-    raw = pd.read_csv(path, sep="\t", header=None, dtype=str)
+    try:
+        raw = pd.read_csv(path, sep="\t", header=None, dtype=str)
+    except pd.errors.EmptyDataError as exc:
+        raise ValueError("credible-set input is empty") from exc
+    if raw.shape[1] < 3:
+        raise ValueError("credible-set input requires at least three columns")
     first = raw.iloc[0].tolist()
-    if not _is_number(first[2]):  # header line present
+    required = {"cs_id", "variant", "pip"}
+    # Recognize named headers, never infer a header from a malformed data PIP.
+    has_header = bool(required.intersection(first))
+    if has_header:
+        if len(set(first)) != len(first):
+            raise ValueError("duplicate column names in credible-set header")
+        if not required <= set(first):
+            raise ValueError("header must contain cs_id, variant and pip")
         raw = raw.iloc[1:].reset_index(drop=True)
         raw.columns = first
-    if {"cs_id", "variant", "pip"} <= set(raw.columns):
-        keep = ["cs_id", "variant", "pip"] + (["molecular_trait_id"] if "molecular_trait_id" in raw.columns else [])
+        keep = ["cs_id", "variant", "pip"] + [
+            c for c in ("molecular_trait_id", "locus_id") if c in raw.columns]
         df = raw[keep].copy()
     else:
         df = raw.iloc[:, :3].copy()
         df.columns = ["cs_id", "variant", "pip"]
-
+    if df.empty:
+        raise ValueError("credible-set input has no data rows")
+    for col in ("cs_id", "molecular_trait_id", "locus_id"):
+        if col in df and (df[col].isna() | df[col].str.strip().eq("")).any():
+            raise ValueError(f"{col} must be non-missing and non-empty")
     df["pip"] = pd.to_numeric(df["pip"], errors="raise")
+    if not (np.isfinite(df["pip"]) & df["pip"].between(0, 1)).all():
+        raise ValueError("PIP must be finite and in [0, 1]")
     parsed = normalize_variant_ids(df["variant"])
     bad = parsed["variant"].isna()
     if bad.any():
@@ -62,6 +79,20 @@ def read_credible_sets(path):
         df = df.rename(columns={"molecular_trait_id": "trait"})
     else:
         df["trait"] = df["cs_id"].str.replace(r"_L\d+$", "", regex=True)
+    if duplicate_policy not in ("error", "collapse-identical"):
+        raise ValueError("unknown duplicate policy")
+    duplicates = df.duplicated(["cs_id", "variant"])
+    removed = 0
+    if duplicates.any():
+        collapsed = df.drop_duplicates()
+        if duplicate_policy == "error" or collapsed.duplicated(["cs_id", "variant"]).any():
+            raise ValueError("duplicate credible-set/variant rows; only identical analysis rows may be explicitly collapsed")
+        removed = len(df) - len(collapsed)
+        df = collapsed.reset_index(drop=True)
+    df.attrs["duplicate_rows_removed"] = removed
+    for col in ("trait", "locus_id"):
+        if col in df and (df.groupby("cs_id")[col].nunique() > 1).any():
+            raise ValueError(f"inconsistent {col} IDs within a credible set")
     return df
 
 
