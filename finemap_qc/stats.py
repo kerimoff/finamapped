@@ -12,6 +12,8 @@ def define_groups(cs, high=0.8, low=0.05, anchor=0.5):
     low_anchored : PIP < low in a credible set whose top variant has PIP > anchor
     Variants that are high-PIP anywhere are removed from both low groups.
     """
+    if not (0 <= low < high <= 1 and 0 <= anchor <= 1):
+        raise ValueError("thresholds must satisfy 0 <= low < high <= 1 and 0 <= anchor <= 1")
     cs_max = cs.groupby("cs_id")["pip"].transform("max")
     high_v = set(cs.loc[cs["pip"] > high, "variant"])
     low_all = set(cs.loc[cs["pip"] < low, "variant"]) - high_v
@@ -61,8 +63,8 @@ def binary_enrichment(annot, groups, features, low_groups=("low_all", "low_ancho
     for low_name in low_groups:
         low = list(groups[low_name])
         for f in features:
-            h = annot.loc[high, f].astype(bool)
-            l = annot.loc[low, f].astype(bool)
+            h = annot.loc[high, f].dropna().astype(bool)
+            l = annot.loc[low, f].dropna().astype(bool)
             a, n1, c, n2 = int(h.sum()), len(h), int(l.sum()), len(l)
             row = {"feature": f, "comparison": f"high_vs_{low_name}",
                    "n_high": n1, "k_high": a, "frac_high": a / n1 if n1 else np.nan,

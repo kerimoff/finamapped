@@ -160,7 +160,7 @@ def config():
 @app.post("/api/run")
 def start_run(credible_sets: UploadFile = File(None), use_example: bool = Form(False),
               high_pip: float = Form(0.8), low_pip: float = Form(0.05), anchor_pip: float = Form(0.5),
-              canonical_only: bool = Form(False), use_refs: bool = Form(True),
+              canonical_only: bool = Form(False), collapse_duplicates: bool = Form(False), use_refs: bool = Form(True),
               bed: list[UploadFile] = File(None), variant_set: list[UploadFile] = File(None),
               score: list[UploadFile] = File(None)):
     _cleanup()
@@ -181,6 +181,8 @@ def start_run(credible_sets: UploadFile = File(None), use_example: bool = Form(F
         ref = state["refs"]["args"] if use_refs and state["refs"] else []
     argv = ["--credible-sets", str(cs), "--out", str(d / "out"), "--high-pip", str(high_pip),
             "--low-pip", str(low_pip), "--anchor-pip", str(anchor_pip)] + list(ref)
+    if collapse_duplicates:
+        argv += ["--duplicate-policy", "collapse-identical"]
     if canonical_only:
         argv.append("--canonical-only")
     if not use_example:
